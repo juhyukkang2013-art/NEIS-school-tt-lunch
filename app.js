@@ -142,10 +142,13 @@ async function neisGet(endpoint, params) {
   const data = await resp.json();
 
   const result = data?.RESULT;
-  if (result?.CODE && result.CODE !== "INFO-000") {
-    const error = new Error(`${result.CODE}: ${result.MESSAGE || "NEIS error"}`);
-    error.code = result.CODE;
-    throw error;
+  if (result?.CODE) {
+    if (result.CODE === "INFO-200") return null; // 데이터 없음
+    if (result.CODE !== "INFO-000") {
+      const error = new Error(`${result.CODE}: ${result.MESSAGE || "NEIS error"}`);
+      error.code = result.CODE;
+      throw error;
+    }
   }
   return data;
 }
@@ -204,59 +207,58 @@ async function refresh() {
   const ymd = isoToYmd(iso);
 
   setStatus("가져오는 중...", "muted");
-  el.meal.textContent = "";
-  el.timetable.textContent = "";
+  el.meal.innerHTML = `<div class="hint">로딩 중...</div>`;
+  el.timetable.innerHTML = `<div class="hint">로딩 중...</div>`;
 
-  try {
-    const endpoint = pickTimetableEndpoint(school.schoolKind);
+  const endpoint = pickTimetableEndpoint(school.schoolKind);
 
-    const [mealData, timetableData] = await Promise.all([
-      neisGet("mealServiceDietInfo", {
-        ATPT_OFCDC_SC_CODE: school.eduOfficeCode,
-        SD_SCHUL_CODE: school.schoolCode,
-        MLSV_YMD: ymd,
-        pIndex: 1,
-        pSize: 50,
-      }),
-      neisGet(endpoint, {
-        ATPT_OFCDC_SC_CODE: school.eduOfficeCode,
-        SD_SCHUL_CODE: school.schoolCode,
-        AY: ymd.slice(0, 4),
-        GRADE: grade,
-        CLASS_NM: className,
-        ALL_TI_YMD: ymd,
-        pIndex: 1,
-        pSize: 100,
-      }),
-    ]);
+  const [mealResult, ttResult] = await Promise.allSettled([
+    neisGet("mealServiceDietInfo", {
+      ATPT_OFCDC_SC_CODE: school.eduOfficeCode,
+      SD_SCHUL_CODE: school.schoolCode,
+      MLSV_YMD: ymd,
+      pIndex: 1,
+      pSize: 50,
+    }),
+    neisGet(endpoint, {
+      ATPT_OFCDC_SC_CODE: school.eduOfficeCode,
+      SD_SCHUL_CODE: school.schoolCode,
+      AY: ymd.slice(0, 4),
+      GRADE: grade,
+      CLASS_NM: className,
+      ALL_TI_YMD: ymd,
+      pIndex: 1,
+      pSize: 100,
+    }),
+  ]);
 
-    const mealRows = mealData?.mealServiceDietInfo?.[1]?.row ?? [];
+  // 급식
+  if (mealResult.status === "fulfilled") {
+    const mealRows = mealResult.value?.mealServiceDietInfo?.[1]?.row ?? [];
     const mealItems = mealRows.map((r) => ({
       date: r.MLSV_YMD,
       mealName: r.MMEAL_SC_NM,
       dishesHtml: r.DDISH_NM,
       calories: r.CAL_INFO,
     }));
+    renderMeal(mealItems, iso);
+  } else {
+    el.meal.innerHTML = `<div class="error">급식 불러오기 실패: ${mealResult.reason?.message}</div>`;
+  }
 
-    const ttRows = timetableData?.[endpoint]?.[1]?.row ?? [];
+  // 시간표
+  if (ttResult.status === "fulfilled") {
+    const ttRows = ttResult.value?.[endpoint]?.[1]?.row ?? [];
     const ttItems = ttRows
       .map((r) => ({ date: r.ALL_TI_YMD, period: r.PERIO, subject: r.ITRT_CNTNT }))
       .sort((a, b) => Number(a.period) - Number(b.period));
-
-    renderMeal(mealItems, iso);
     renderTimetable(ttItems, iso);
-    setStatus("완료", "ok");
-  } catch (e) {
-    if (e.code === "INFO-200") {
-      setStatus("해당 날짜에 데이터가 없어요.", "muted");
-      el.meal.innerHTML = `<div class="hint">급식 정보가 없어요.</div>`;
-      el.timetable.innerHTML = `<div class="hint">시간표 정보가 없어요.</div>`;
-    } else {
-      setStatus(`실패: ${e.message}`, "error");
-      el.meal.innerHTML = `<div class="error">불러오기 실패</div>`;
-      el.timetable.innerHTML = `<div class="error">불러오기 실패</div>`;
-    }
+  } else {
+    el.timetable.innerHTML = `<div class="error">시간표 불러오기 실패: ${ttResult.reason?.message}</div>`;
   }
+
+  const bothOk = mealResult.status === "fulfilled" && ttResult.status === "fulfilled";
+  setStatus(bothOk ? "완료" : "일부 데이터를 불러오지 못했어요.", bothOk ? "ok" : "muted");
 }
 
 function renderMeal(items, isoDate) {
