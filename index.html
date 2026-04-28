@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>학교 급식/시간표</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div class="brand">
+        <div class="brand__title">학교 급식/시간표</div>
+        <div class="brand__sub">NEIS 오픈API 기반 (학교 검색 + 캐시)</div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="card">
+        <h2 class="card__title">학교 검색</h2>
+        <div class="row">
+          <input id="schoolQuery" class="input" placeholder="학교 이름 (예: 은가람중학교)" autocomplete="off" />
+          <button id="clearSchool" class="btn btn--ghost" type="button">초기화</button>
+        </div>
+        <div id="schoolResults" class="results"></div>
+        <div id="pickedSchool" class="picked"></div>
+      </section>
+
+      <section class="grid">
+        <section class="card">
+          <h2 class="card__title">설정</h2>
+          <div class="row">
+            <label class="label">
+              학년
+              <input id="grade" class="input" inputmode="numeric" placeholder="예: 1" />
+            </label>
+            <label class="label">
+              반
+              <input id="className" class="input" inputmode="numeric" placeholder="예: 2" />
+            </label>
+          </div>
+          <div class="row">
+            <label class="label">
+              날짜
+              <input id="date" class="input" type="date" />
+            </label>
+            <button id="refresh" class="btn" type="button">가져오기</button>
+          </div>
+          <div class="hint" id="status"></div>
+        </section>
+
+        <section class="card">
+          <h2 class="card__title">급식</h2>
+          <div id="meal" class="box"></div>
+        </section>
+
+        <section class="card">
+          <h2 class="card__title">시간표</h2>
+          <div id="timetable" class="box"></div>
+        </section>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>검색 결과는 브라우저 캐시에 저장됩니다.</span>
+    </footer>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
+
